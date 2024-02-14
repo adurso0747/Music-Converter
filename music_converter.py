@@ -36,7 +36,11 @@ class MusicConverterApp:
         self.progress = ttk.Progressbar(master, orient="horizontal", length=300, mode="determinate")
         self.progress.pack(pady=20)
 
-    
+        # Thread Frame for Number of Threads Selection
+        self.thread_frame = ttk.Frame(self.main_frame)  # Ensure this line is before its use
+        self.thread_frame.pack(pady=10, fill=tk.X)
+        self.setup_thread_selection()
+
     def setup_file_selection(self):
         # Folder Selection
         self.folder_frame = ttk.Frame(self.main_frame)
@@ -71,13 +75,22 @@ class MusicConverterApp:
             ttk.Radiobutton(self.bitrate_mode_frame, text=mode, value=value, variable=self.bitrate_mode, command=self.update_bitrate_options_visibility).pack(side=tk.LEFT, expand=True)
 
     def setup_bitrate_options(self):
-        self.constant_bitrate_var = tk.StringVar(value="192")
+        self.constant_bitrate_var = tk.StringVar(value="320")
         self.constant_bitrate_options = ttk.Combobox(self.main_frame, textvariable=self.constant_bitrate_var, values=["128", "192", "256", "320"], state="readonly")
         self.variable_bitrate_var = tk.StringVar(value="V0")
         self.variable_bitrate_options = ttk.Combobox(self.main_frame, textvariable=self.variable_bitrate_var, values=["V0", "V2"], state="readonly")
         self.custom_bitrate_entry = ttk.Entry(self.main_frame)
         self.custom_bitrate_entry.insert(0, "192")  # Default value
         self.update_bitrate_options_visibility()
+
+    def setup_thread_selection(self):
+        default_threads = os.cpu_count() or 1  # Default to CPU count or 1 if unavailable
+        self.thread_label = ttk.Label(self.thread_frame, text="Number of Threads:")
+        self.thread_label.pack(side=tk.LEFT, padx=5)
+
+        self.thread_spinbox = ttk.Spinbox(self.thread_frame, from_=1, to=2 * default_threads, wrap=True)
+        self.thread_spinbox.set(default_threads)  # Set the default value
+        self.thread_spinbox.pack(side=tk.RIGHT, expand=True, fill=tk.X, padx=5)
 
     def update_bitrate_options_visibility(self):
         if self.bitrate_mode.get() == "constant":
@@ -143,11 +156,12 @@ class MusicConverterApp:
                 source_path = os.path.join(source_folder, item)
                 destination_path = os.path.join(destination_folder, item)
                 shutil.copy(source_path, destination_path)
+                self.progress["value"] += 1
 
     def start_conversion_process(self, output_path):
         total_files = sum(len(files) for folder_path in self.selected_folders for _, _, files in os.walk(folder_path))
         self.progress["maximum"] = total_files
-        processed_files = 0
+        self.progress["value"] = 0
 
         for folder_path in self.selected_folders:
             target_format = "mp3"
@@ -163,14 +177,16 @@ class MusicConverterApp:
                 if file.endswith(".wav") or file.endswith(".flac"):
                     self.convert_file(os.path.join(folder_path, file), target_format, bitrate_mode, bitrate_value,
                                       final_output_path)
-                    processed_files += 1
-                    self.progress["value"] = processed_files
+                    self.progress["value"] += 1
                     self.master.update_idletasks()  # Ensure UI updates are processed
 
             # Copy album artwork
             self.copy_image_files(folder_path, final_output_path)
-            # Adjust the progress bar to account for any album artwork
-            self.progress["value"] = total_files
+
+        # After all processing is complete show a completion message
+        def on_completion():
+            messagebox.showinfo("Conversion Complete!", "All processing has completed successfully.")
+        self.master.after(0, on_completion)
 
     def convert(self):
         if hasattr(self, 'selected_folders'):  # Check if multiple folders have been selected
