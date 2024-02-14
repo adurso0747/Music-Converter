@@ -3,7 +3,8 @@ from tkinter import filedialog, messagebox, ttk
 import subprocess
 import os
 from tkfilebrowser import askopendirnames
-import shutil 
+import shutil
+import threading
 
 class MusicConverterApp:
     def __init__(self, master):
@@ -18,11 +19,15 @@ class MusicConverterApp:
         # Bitrate Mode Selection
         self.bitrate_mode = tk.StringVar(value="constant")
 
+        # Main frame
+        self.main_frame = ttk.Frame(master)
+        self.main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
         # Setup UI Components
-        self.setup_file_selection(master)
-        self.setup_output_selection(master)
-        self.setup_bitrate_mode_selection(master)
-        self.setup_bitrate_options(master)
+        self.setup_file_selection()
+        self.setup_output_selection()
+        self.setup_bitrate_mode_selection()
+        self.setup_bitrate_options()
 
         # Convert Button
         self.convert_btn = ttk.Button(master, text="Convert", command=self.convert)
@@ -32,9 +37,9 @@ class MusicConverterApp:
         self.progress.pack(pady=20)
 
     
-    def setup_file_selection(self, master):
+    def setup_file_selection(self):
         # Folder Selection
-        self.folder_frame = ttk.Frame(master)
+        self.folder_frame = ttk.Frame(self.main_frame)
         self.folder_frame.pack(pady=10, fill=tk.X)
         self.folder_label = ttk.Label(self.folder_frame, text="No folder selected")
         self.folder_label.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
@@ -42,35 +47,35 @@ class MusicConverterApp:
         self.select_folder_btn.pack(side=tk.RIGHT, padx=5)
 
         # File Selection
-        self.file_frame = ttk.Frame(master)
+        self.file_frame = ttk.Frame(self.main_frame)
         self.file_frame.pack(pady=10, fill=tk.X)
         self.file_label = ttk.Label(self.file_frame, text="No file selected")
         self.file_label.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         self.select_file_btn = ttk.Button(self.file_frame, text="Select File", command=self.select_file)
         self.select_file_btn.pack(side=tk.RIGHT, padx=5)
 
-    def setup_output_selection(self, master):
+    def setup_output_selection(self):
         # Output Directory Selection
-        self.output_frame = ttk.Frame(master)
+        self.output_frame = ttk.Frame(self.main_frame)
         self.output_frame.pack(pady=10, fill=tk.X)
         self.output_label = ttk.Label(self.output_frame, text="No output location selected")
         self.output_label.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         self.select_output_btn = ttk.Button(self.output_frame, text="Select Output", command=self.select_output)
         self.select_output_btn.pack(side=tk.RIGHT, padx=5)
 
-    def setup_bitrate_mode_selection(self, master):
-        self.bitrate_mode_frame = ttk.LabelFrame(master, text="Bitrate Mode")
+    def setup_bitrate_mode_selection(self):
+        self.bitrate_mode_frame = ttk.LabelFrame(self.main_frame, text="Bitrate Mode")
         self.bitrate_mode_frame.pack(pady=10, fill=tk.X)
         modes = [("Constant Bitrate", "constant"), ("Variable Bitrate", "variable"), ("Custom", "custom")]
         for mode, value in modes:
             ttk.Radiobutton(self.bitrate_mode_frame, text=mode, value=value, variable=self.bitrate_mode, command=self.update_bitrate_options_visibility).pack(side=tk.LEFT, expand=True)
 
-    def setup_bitrate_options(self, master):
+    def setup_bitrate_options(self):
         self.constant_bitrate_var = tk.StringVar(value="192")
-        self.constant_bitrate_options = ttk.Combobox(master, textvariable=self.constant_bitrate_var, values=["128", "192", "256", "320"], state="readonly")
+        self.constant_bitrate_options = ttk.Combobox(self.main_frame, textvariable=self.constant_bitrate_var, values=["128", "192", "256", "320"], state="readonly")
         self.variable_bitrate_var = tk.StringVar(value="V0")
-        self.variable_bitrate_options = ttk.Combobox(master, textvariable=self.variable_bitrate_var, values=["V0", "V2"], state="readonly")
-        self.custom_bitrate_entry = ttk.Entry(master)
+        self.variable_bitrate_options = ttk.Combobox(self.main_frame, textvariable=self.variable_bitrate_var, values=["V0", "V2"], state="readonly")
+        self.custom_bitrate_entry = ttk.Entry(self.main_frame)
         self.custom_bitrate_entry.insert(0, "192")  # Default value
         self.update_bitrate_options_visibility()
 
@@ -128,27 +133,54 @@ class MusicConverterApp:
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
+    def copy_image_files(self, source_folder, destination_folder):
+        """
+        Copy image files from the source folder to the destination folder.
+        """
+        image_extensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp']
+        for item in os.listdir(source_folder):
+            if any(item.lower().endswith(ext) for ext in image_extensions):
+                source_path = os.path.join(source_folder, item)
+                destination_path = os.path.join(destination_folder, item)
+                shutil.copy(source_path, destination_path)
+
+    def start_conversion_process(self, output_path):
+        total_files = sum(len(files) for folder_path in self.selected_folders for _, _, files in os.walk(folder_path))
+        self.progress["maximum"] = total_files
+        processed_files = 0
+
+        for folder_path in self.selected_folders:
+            target_format = "mp3"
+            bitrate_mode = self.bitrate_mode.get()
+            bitrate_value = self.constant_bitrate_var.get() if bitrate_mode == "constant" else self.variable_bitrate_var.get() if bitrate_mode == "variable" else self.custom_bitrate_entry.get()
+
+            new_folder_name = os.path.basename(folder_path)
+            final_output_path = os.path.join(output_path, new_folder_name)
+            if not os.path.exists(final_output_path):
+                os.makedirs(final_output_path)
+
+            for file in os.listdir(folder_path):
+                if file.endswith(".wav") or file.endswith(".flac"):
+                    self.convert_file(os.path.join(folder_path, file), target_format, bitrate_mode, bitrate_value,
+                                      final_output_path)
+                    processed_files += 1
+                    self.progress["value"] = processed_files
+                    self.master.update_idletasks()  # Ensure UI updates are processed
+
+            # Copy album artwork
+            self.copy_image_files(folder_path, final_output_path)
+            # Adjust the progress bar to account for any album artwork
+            self.progress["value"] = total_files
+
     def convert(self):
-        # This method has been adjusted to handle multiple selected folders
         if hasattr(self, 'selected_folders'):  # Check if multiple folders have been selected
-            for folder_path in self.selected_folders:
-                output_path = self.output_label.cget("text")
-                if output_path == "No output location selected":
-                    messagebox.showerror("Error", "Please select an output location.")
-                    return
+            output_path = self.output_label.cget("text")
+            if output_path == "No output location selected":
+                messagebox.showerror("Error", "Please select an output location.")
+                return
 
-                target_format = "mp3"
-                bitrate_mode = self.bitrate_mode.get()
-                bitrate_value = self.constant_bitrate_var.get() if bitrate_mode == "constant" else self.variable_bitrate_var.get() if bitrate_mode == "variable" else self.custom_bitrate_entry.get()
-
-                new_folder_name = os.path.basename(folder_path)
-                final_output_path = os.path.join(output_path, new_folder_name)
-                if not os.path.exists(final_output_path):
-                    os.makedirs(final_output_path)
-
-                for file in os.listdir(folder_path):
-                    if file.endswith(".wav") or file.endswith(".flac"):
-                        self.convert_file(os.path.join(folder_path, file), target_format, bitrate_mode, bitrate_value, final_output_path)
+            # Start the conversion process in a new thread to keep UI responsive
+            threading.Thread(target=self.start_conversion_process, args=(output_path,), daemon=True).start()
         else:
             messagebox.showerror("Error", "Please select one or more folders.")
 
