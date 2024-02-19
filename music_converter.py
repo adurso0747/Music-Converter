@@ -10,7 +10,8 @@ class MusicConverterApp:
     def __init__(self, master):
         self.master = master
         master.title("Music Converter")
-        master.geometry('400x400')  # Adjusted size for additional controls
+        master.geometry('600x500')
+        master.minsize(600,500)
 
         # Initialize ttk style
         style = ttk.Style()
@@ -37,7 +38,7 @@ class MusicConverterApp:
         self.progress.pack(pady=20)
 
         # Thread Frame for Number of Threads Selection
-        self.thread_frame = ttk.Frame(self.main_frame)  # Ensure this line is before its use
+        self.thread_frame = ttk.Frame(self.main_frame)
         self.thread_frame.pack(pady=10, fill=tk.X)
         self.setup_thread_selection()
 
@@ -75,11 +76,15 @@ class MusicConverterApp:
             ttk.Radiobutton(self.bitrate_mode_frame, text=mode, value=value, variable=self.bitrate_mode, command=self.update_bitrate_options_visibility).pack(side=tk.LEFT, expand=True)
 
     def setup_bitrate_options(self):
+        self.options_frame = ttk.Frame(self.main_frame)
+        self.options_frame.pack(pady=10, fill=tk.X)
+        self.options_label = ttk.Label(self.options_frame, text="Options:")
+        self.options_label.pack(side=tk.LEFT, padx=5)
         self.constant_bitrate_var = tk.StringVar(value="320")
-        self.constant_bitrate_options = ttk.Combobox(self.main_frame, textvariable=self.constant_bitrate_var, values=["128", "192", "256", "320"], state="readonly")
+        self.constant_bitrate_options = ttk.Combobox(self.options_frame, textvariable=self.constant_bitrate_var, values=["128", "192", "256", "320"], state="readonly")
         self.variable_bitrate_var = tk.StringVar(value="V0")
-        self.variable_bitrate_options = ttk.Combobox(self.main_frame, textvariable=self.variable_bitrate_var, values=["V0", "V2"], state="readonly")
-        self.custom_bitrate_entry = ttk.Entry(self.main_frame)
+        self.variable_bitrate_options = ttk.Combobox(self.options_frame, textvariable=self.variable_bitrate_var, values=["V0", "V2"], state="readonly")
+        self.custom_bitrate_entry = ttk.Entry(self.options_frame)
         self.custom_bitrate_entry.insert(0, "192")  # Default value
         self.update_bitrate_options_visibility()
 
@@ -88,7 +93,7 @@ class MusicConverterApp:
         self.thread_label = ttk.Label(self.thread_frame, text="Number of Threads:")
         self.thread_label.pack(side=tk.LEFT, padx=5)
 
-        self.thread_spinbox = ttk.Spinbox(self.thread_frame, from_=1, to=2 * default_threads, wrap=True)
+        self.thread_spinbox = ttk.Spinbox(self.thread_frame, from_=1, to=default_threads, wrap=True)
         self.thread_spinbox.set(default_threads)  # Set the default value
         self.thread_spinbox.pack(side=tk.RIGHT, expand=True, fill=tk.X, padx=5)
 
@@ -159,34 +164,52 @@ class MusicConverterApp:
                 self.progress["value"] += 1
 
     def start_conversion_process(self, output_path):
+        self.progress["value"] = 0  # Reset progress bar to 0
+        # Calculate total number of files to process
         total_files = sum(len(files) for folder_path in self.selected_folders for _, _, files in os.walk(folder_path))
         self.progress["maximum"] = total_files
-        self.progress["value"] = 0
+        processed_files = 0  # Counter for processed files
 
-        for folder_path in self.selected_folders:
+        # Lock for thread-safe updates to the processed_files and progress bar
+        lock = threading.Lock()
+
+        # Function to process each file and copy artwork within a folder
+        def process_folder(folder_path):
+            nonlocal processed_files
             target_format = "mp3"
             bitrate_mode = self.bitrate_mode.get()
             bitrate_value = self.constant_bitrate_var.get() if bitrate_mode == "constant" else self.variable_bitrate_var.get() if bitrate_mode == "variable" else self.custom_bitrate_entry.get()
 
+            # Correctly forming the final output path for each folder
             new_folder_name = os.path.basename(folder_path)
             final_output_path = os.path.join(output_path, new_folder_name)
-            if not os.path.exists(final_output_path):
-                os.makedirs(final_output_path)
+            os.makedirs(final_output_path, exist_ok=True)  # Ensures directory exists
 
-            for file in os.listdir(folder_path):
-                if file.endswith(".wav") or file.endswith(".flac"):
-                    self.convert_file(os.path.join(folder_path, file), target_format, bitrate_mode, bitrate_value,
-                                      final_output_path)
-                    self.progress["value"] += 1
-                    self.master.update_idletasks()  # Ensure UI updates are processed
+            for root, dirs, files in os.walk(folder_path):
+                for file in files:
+                    if file.endswith((".wav", ".flac")):
+                        self.convert_file(os.path.join(root, file), target_format, bitrate_mode, bitrate_value,
+                                          final_output_path)
+                        with lock:
+                            processed_files += 1
+                            self.master.after(0, lambda: self.progress.configure(value=processed_files))
 
-            # Copy album artwork
+            # Copy album artwork after processing all files in the folder
             self.copy_image_files(folder_path, final_output_path)
 
-        # After all processing is complete show a completion message
-        def on_completion():
-            messagebox.showinfo("Conversion Complete!", "All processing has completed successfully.")
-        self.master.after(0, on_completion)
+        # Create and start a thread for each folder
+        threads = [threading.Thread(target=process_folder, args=(folder_path,)) for folder_path in
+                   self.selected_folders]
+        for thread in threads:
+            thread.start()
+
+        # Wait for all threads to complete
+        for thread in threads:
+            thread.join()
+
+        # After all threads complete, show a completion message
+        self.master.after(0, lambda: messagebox.showinfo("Conversion Complete!",
+                                                         "All processing has completed successfully."))
 
     def convert(self):
         if hasattr(self, 'selected_folders'):  # Check if multiple folders have been selected
