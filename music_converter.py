@@ -46,7 +46,7 @@ class MusicConverterApp:
         # Folder Selection
         self.folder_frame = ttk.Frame(self.main_frame)
         self.folder_frame.pack(pady=10, fill=tk.X)
-        self.folder_label = ttk.Label(self.folder_frame, text="No folder selected")
+        self.folder_label = ttk.Label(self.folder_frame, text="No folder selected", wraplength=400)
         self.folder_label.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         self.select_folder_btn = ttk.Button(self.folder_frame, text="Select Folder", command=self.select_folder)
         self.select_folder_btn.pack(side=tk.RIGHT, padx=5)
@@ -54,7 +54,7 @@ class MusicConverterApp:
         # File Selection
         self.file_frame = ttk.Frame(self.main_frame)
         self.file_frame.pack(pady=10, fill=tk.X)
-        self.file_label = ttk.Label(self.file_frame, text="No file selected")
+        self.file_label = ttk.Label(self.file_frame, text="No file selected", wraplength=400)
         self.file_label.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         self.select_file_btn = ttk.Button(self.file_frame, text="Select File", command=self.select_file)
         self.select_file_btn.pack(side=tk.RIGHT, padx=5)
@@ -114,7 +114,7 @@ class MusicConverterApp:
     def select_folder(self):
         folder_paths = askopendirnames()  # Use tkfilebrowser to select multiple folders
         if folder_paths:
-            folder_paths_str = "; ".join(folder_paths)  # Join selected folder paths into a single string
+            folder_paths_str = "\n".join(folder_paths)  # Join selected folder paths into a single string
             self.folder_label.config(text=folder_paths_str)
             self.selected_folders = folder_paths  # Store the list of selected folders for later processing
 
