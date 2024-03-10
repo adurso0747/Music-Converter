@@ -1,8 +1,8 @@
 from typing import Union, Callable
-from customtkinter import *
+import customtkinter as ctk
 
 
-class FloatSpinbox(CTkFrame):
+class FloatSpinbox(ctk.CTkFrame):
     def __init__(self, *args,
                  width: int = 100,
                  height: int = 32,
@@ -23,14 +23,14 @@ class FloatSpinbox(CTkFrame):
         self.grid_columnconfigure((0, 2), weight=0)  # buttons don't expand
         self.grid_columnconfigure(1, weight=1)  # entry expands
 
-        self.subtract_button = CTkButton(self, text="-", width=height - 6, height=height - 6,
+        self.subtract_button = ctk.CTkButton(self, text="-", width=height - 6, height=height - 6,
                                          command=self.subtract_button_callback)
         self.subtract_button.grid(row=0, column=0, padx=(3, 0), pady=3)
 
-        self.entry = CTkEntry(self, width=width - (2 * height), height=height - 6, border_width=0)
+        self.entry = ctk.CTkEntry(self, width=width - (2 * height), height=height - 6, border_width=0)
         self.entry.grid(row=0, column=1, columnspan=1, padx=3, pady=3, sticky="ew")
 
-        self.add_button = CTkButton(self, text="+", width=height - 6, height=height - 6,
+        self.add_button = ctk.CTkButton(self, text="+", width=height - 6, height=height - 6,
                                     command=self.add_button_callback)
         self.add_button.grid(row=0, column=2, padx=(0, 3), pady=3)
 
