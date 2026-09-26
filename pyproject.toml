@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "music-converter"
+dynamic = ["version"]
+description = "Convert FLAC/WAV music to MP3, Opus, AAC or Ogg Vorbis, keeping folder structure and album art."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Alex Durso" }]
+requires-python = ">=3.10"
+dependencies = ["customtkinter>=5.2"]
+keywords = ["audio", "converter", "flac", "mp3", "opus", "ffmpeg"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Win32 (MS Windows)",
+    "Environment :: X11 Applications",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Sound/Audio :: Conversion",
+]
+
+[project.urls]
+Homepage = "https://github.com/adurso0747/Music-Converter"
+Issues = "https://github.com/adurso0747/Music-Converter/issues"
+Changelog = "https://github.com/adurso0747/Music-Converter/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+build = ["pyinstaller>=6"]
+
+[project.scripts]
+music-converter-cli = "music_converter.cli:main"
+
+[project.gui-scripts]
+music-converter = "music_converter.gui:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "music_converter.__version__" }
+
+[tool.setuptools.package-data]
+music_converter = ["assets/*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = [
+    "RUF001",  # ambiguous unicode in strings: the UI deliberately uses "…", "–" and "✕"
+]
